@@ -4,13 +4,13 @@
 current_date=$(date +"%Y-%m-%d")
 readonly edm_abbrev="EDM"
 readonly scoreboard_endpt="https://api-web.nhle.com/v1/scoreboard/${edm_abbrev}/now"
-readonly schedule_now_enpt="https://api-web.nhle.com/v1/schedule/${current_date}"
+readonly schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
 
 # Format to match the date format in the response
 #echo "The current date is ${current_date}"
 
 get_games_today(){
-    local schedule_now_data=$(curl -sX GET $schedule_now_enpt)
+    local schedule_now_data=$(curl -sX GET $schedule_now_endpt)
 
     local game_week=$(echo $schedule_now_data | jq -c '.gameWeek[]')
     # Not using quotes with the echo flattens the json causing issues...
@@ -41,16 +41,33 @@ check_if_playing_today(){
     done <<< "$games_today" 
 }
 
+check_if_game_live(){
+    local game_id="$1"
+    readonly boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
+    local game_info=$(curl -sX GET $boxscore_endpt)
+    local game_state=$(echo "$game_info" | jq -r ".gameState")
+    if [[ "$game_state" == "LIVE" ]]; then
+        return 0
+    fi
+    return 1
+}
+
 games_today=$(get_games_today)
 
 game_id=0 # used in check_if_playing_today 
-check_if_playing_today "$games_today"
-echo "$game_id"
-
-
-
-
-
-#json_data=$(curl -X GET $scoreboard_endpt)
-# Piping to jq in this case just pretty prints the data
-#echo $json_data | jq .
+if check_if_playing_today "$games_today"; then
+    # TODO: Remove later
+    if check_if_game_live "$game_id"; then
+    #if check_if_game_live 2024030311; then
+        echo "The game is live"
+    else
+        echo "Game is not live"
+    fi
+else
+    # TODO: Remove later, whole if block
+    if check_if_game_live 2024030311; then
+        echo "The game is live"
+    else
+        echo "Game is not live"
+    fi
+fi
