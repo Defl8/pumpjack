@@ -3,13 +3,12 @@
 # No true constants so using read only just to prevent bugs
 current_date=$(date +"%Y-%m-%d")
 readonly edm_abbrev="EDM"
-readonly scoreboard_endpt="https://api-web.nhle.com/v1/scoreboard/${edm_abbrev}/now"
-readonly schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
 
 # Format to match the date format in the response
 #echo "The current date is ${current_date}"
 
 get_games_today(){
+    readonly schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
     local schedule_now_data=$(curl -sX GET $schedule_now_endpt)
 
     local game_week=$(echo $schedule_now_data | jq -c '.gameWeek[]')
@@ -50,6 +49,28 @@ check_if_game_live(){
         return 0
     fi
     return 1
+}
+
+format_live(){
+    local game_id="$1"
+    readonly boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
+    local game_info=$(curl -sX GET $boxscore_endpt)
+    local away_team=$(echo "$game_info" | jq -r '.awayTeam.abbrev')
+    local home_team=$(echo "$game_info" | jq -r '.homeTeam.abbrev')
+
+    local away_score=$(echo "$game_info" | jq -r '.awayTeam.score')
+    local home_score=$(echo "$game_info" | jq -r '.homeTeam.score')
+
+    local time_remaining=$(echo "$game_info" | jq -r '.clock.timeRemaining')
+    local period_num=$(echo "$game_info" | jq -r '.periodDescriptor.number')
+    local num_denom="nd"
+
+    local period="${period}${period_num}"
+    if (( period_num == 3)); then
+        period="${period}rd"
+    fi
+
+    echo "$away_team $away_score - $period $time_remaining - $home_score $home_team"
 }
 
 games_today=$(get_games_today)
