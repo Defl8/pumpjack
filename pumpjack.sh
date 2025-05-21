@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 
+# TODO: 
+# - Make functions to get the common values from the responses
+#   - Get away/home team info
+# - Add handling for when GET requests fail
+# - Move endpoints to global scope
+
 # No true constants so using read only just to prevent bugs
 current_date=$(date +"%Y-%m-%d")
-readonly edm_abbrev="EDM"
+edm_abbrev="EDM"
+
+### ENDPOINTS ###
+schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
 
 # Format to match the date format in the response
 #echo "The current date is ${current_date}"
 
 get_games_today(){
-    readonly schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
     local schedule_now_data=$(curl -sX GET $schedule_now_endpt)
-
     local game_week=$(echo $schedule_now_data | jq -c '.gameWeek[]')
     # Not using quotes with the echo flattens the json causing issues...
     echo "$game_week" | while read -r day; do
@@ -22,15 +29,56 @@ get_games_today(){
     done
 }
 
+declare -A game_info
+get_game_info(){
+    local game="$1"
+    local id=$(echo "$game" | jq -r '.id')
+    game_info["id"]="$id"
+
+    local away_team=$(echo "$game" | jq -r '.awayTeam.abbrev')
+    local away_score=$(echo "$game" | jq -r '.awayTeam.score')
+    game_info["away_team"]="$away_team"
+    game_info["away_score"]="$away_score"
+
+    local home_team=$(echo "$game" | jq -r '.homeTeam.abbrev')
+    local home_score=$(echo "$game" | jq -r '.homeTeam.score')
+    game_info["home_team"]="$home_team"
+    game_info["home_score"]="$home_score"
+
+    local game_state=$(echo "$game" | jq -r '.gameState')
+    game_info["game_state"]="$game_state"
+
+    local time_remaining=$(echo "$game" | jq -r '.clock.timeRemaining')
+    game_info["time_remaining"]="$time_remaining"
+
+    local period_num=$(echo "$game" | jq -r '.periodDescriptor.number')
+    local num_denom="nd"
+    local period="${period}${period_num}"
+
+    if (( period_num == 3)); then
+        period="${period}rd"
+    elif (( period_num == 4)); then
+        period="OT"
+    fi
+    game_info["period"]="$period"
+
+    local game_time_utc=$(echo "$game" | jq -r '.startTimeUTC')
+    game_info["game_time_utc"]="$game_time_utc"
+}
+
+utc_to_local(){
+    local time_utc="$1"
+    local format_local="$2"
+    local time_local=$(date -d "$time_utc" +"$format_local")
+    echo "$time_local"
+}
+
 check_if_playing_today(){
     local games_today="$1"
     while read -r game; do
-        local game_state=$(echo "$game" | jq -c '.gameState')
-
-        local away_team=$(echo "$game" | jq -c '.awayTeam.abbrev')
-        local home_team=$(echo "$game" | jq -c '.homeTeam.abbrev')
-        if [[ "$home_team" == "$edm_abbrev" || "$away_team" == "$edm_abbrev" ]]; then
-            game_id=$(echo "$game" | jq -c '.id')
+        get_game_info "$game"
+        if [[ "${game_info["home_team"]}" == "$edm_abbrev" || "${game_info["away_team"]}" == "$edm_abbrev" ]]; then
+            game_id="${game_info["id"]}"
             return 0 # Game is being played today
         fi
     return 1 # Game is not being played today
@@ -43,44 +91,32 @@ check_if_playing_today(){
 check_if_game_live(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game_info=$(curl -sX GET $boxscore_endpt)
-    local game_state=$(echo "$game_info" | jq -r ".gameState")
+    local game=$(curl -sX GET $boxscore_endpt)
+    get_game_info "$game"
+    local game_state="${game_info["game_state"]}"
     # "FUT" means future
-    if [[ "$game_state" != "OFF" || "$game_state" != "FUT" ]]; then
-        return 0
+    if [[ "$game_state" == "OFF" || "$game_state" == "FUT" ]]; then
+        return 1
     fi
-    return 1
+    return 0
 }
 
 format_live(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game_info=$(curl -sX GET $boxscore_endpt)
-    local game_state=$(echo "$game_info" | jq -r ".gameState")
+    local game=$(curl -sX GET $boxscore_endpt)
 
-    local away_team=$(echo "$game_info" | jq -r '.awayTeam.abbrev')
-    local home_team=$(echo "$game_info" | jq -r '.homeTeam.abbrev')
-    local away_score=$(echo "$game_info" | jq -r '.awayTeam.score')
-    local home_score=$(echo "$game_info" | jq -r '.homeTeam.score')
-
-    local time_remaining=$(echo "$game_info" | jq -r '.clock.timeRemaining')
-    local period_num=$(echo "$game_info" | jq -r '.periodDescriptor.number')
-    local num_denom="nd"
-
-    local period="${period}${period_num}"
-    if (( period_num == 3)); then
-        period="${period}rd"
-    elif (( period_num == 4)); then
-        period="OT"
-    fi
-
-    if [[ "$game_state" != "FINAL" ]]; then
-        echo "$away_team $away_score - $period $time_remaining - $home_score $home_team"
+    get_game_info "$game"
+    if [[ "$game_info["game_state"]" != "FINAL" ]]; then
+        echo "${game_info["away_team"]} ${game_info["away_score"]} - ${game_info["period"]} ${game_info["time_remaining"]} - ${game_info["home_score"]} ${game_info["home_team"]}"
+        return 0
     else
-        if [[ "$period" != "OT" ]]; then
-            echo "$away_team $away_score - FINAL - $home_score $home_team"
+        if [[ "$game_info["period"]" != "OT" ]]; then
+            echo "${game_info["away_team"]} ${game_info["away_score"]} - FINAL - ${game_info["home_score"]} ${game_info["home_team"]}"
+            return 0
         else
-            echo "$away_team $away_score - FINAL/OT - $home_score $home_team"
+            echo "${game_info["away_team"]} ${game_info["away_score"]} - FINAL/OT - ${game_info["home_score"]} ${game_info["home_team"]}"
+            return 0
         fi
     fi
 }
@@ -88,13 +124,11 @@ format_live(){
 format_later_today(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game_info=$(curl -sX GET $boxscore_endpt)
+    local game=$(curl -sX GET $boxscore_endpt)
+    get_game_info "$game"
+    local game_time_local=$(utc_to_local "${game_info["game_time_utc"]}" "Today @ %H:%M")
 
-    local away_team=$(echo "$game_info" | jq -r '.awayTeam.abbrev')
-    local home_team=$(echo "$game_info" | jq -r '.homeTeam.abbrev')
-    local game_time_utc=$(echo "$game_info" | jq -r '.startTimeUTC')
-    local game_time_mst=$(date -d "$game_time_utc" +"Today @ %H:%M")
-    echo "$game_time_mst | $away_team @ $home_team"
+    echo "${game_time_local} | ${game_info["away_team"]} @ ${game_info["home_team"]}"
 }
 
 get_next_game(){
@@ -109,15 +143,12 @@ get_next_game(){
 
 format_next_game(){
     local next_game="$1"
-    local away_team=$(echo "$next_game" | jq -r '.awayTeam.abbrev')
-    local home_team=$(echo "$next_game" | jq -r '.homeTeam.abbrev')
-
-    local game_time_utc=$(echo "$next_game" | jq -r '.startTimeUTC')
-    local game_time_mst=$(date -d "$game_time_utc" +"%a @ %H:%M")
+    get_game_info "$next_game"
+    local game_time_local=$(utc_to_local "${game_info["game_time_utc"]}" "%a @ %H:%M")
     if [[ -z "$next_game" ]]; then
         echo "No games scheduled"
     else
-        echo "$game_time_mst | $away_team @ $home_team"
+        echo "$game_time_local | ${game_info[away_team]} @ ${game_info[home_team]}"
     fi
 }
 
