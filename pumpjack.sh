@@ -112,7 +112,8 @@ check_if_playing_today(){
 check_if_game_live(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game=$(curl -sX GET $boxscore_endpt)
+    #local game=$(curl -sX GET $boxscore_endpt)
+    local game=$(make_get_request "$boxscore_endpt")
     get_game_info "$game"
     local game_state="${game_info["game_state"]}"
     # "FUT" means future
@@ -125,7 +126,7 @@ check_if_game_live(){
 format_live(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game=$(curl -sX GET $boxscore_endpt)
+    local game=$(make_get_request "$boxscore_endpt")
 
     get_game_info "$game"
     if [[ "$game_info["game_state"]" != "FINAL" ]]; then
@@ -145,7 +146,7 @@ format_live(){
 format_later_today(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    local game=$(curl -sX GET $boxscore_endpt)
+    local game=$(make_get_request "$boxscore_endpt")
     get_game_info "$game"
     local game_time_local=$(utc_to_local "${game_info["game_time_utc"]}" "Today @ %H:%M")
 
@@ -154,7 +155,8 @@ format_later_today(){
 
 get_next_game(){
     local schedule_week_endpt="https://api-web.nhle.com/v1/club-schedule/${edm_abbrev}/week/${current_date}" 
-    local week_info=$(curl -sX GET "$schedule_week_endpt")
+    #local week_info=$(curl -sX GET "$schedule_week_endpt")
+    local week_info=$(make_get_request "$schedule_week_endpt")
 
     # The first element in the list of games for the week is always the one
     # closest to the current date
