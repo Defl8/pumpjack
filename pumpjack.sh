@@ -93,13 +93,32 @@ format_later_today(){
     local away_team=$(echo "$game_info" | jq -r '.awayTeam.abbrev')
     local home_team=$(echo "$game_info" | jq -r '.homeTeam.abbrev')
     local game_time_utc=$(echo "$game_info" | jq -r '.startTimeUTC')
-    local game_time_mst=$(date -d "$game_time_utc" +"%a @ %H:%M")
+    local game_time_mst=$(date -d "$game_time_utc" +"Today @ %H:%M")
     echo "$game_time_mst | $away_team @ $home_team"
 }
 
 get_next_game(){
-   local schedule_week_endpt="https://api-web.nhle.com/v1/club-schedule/${edm_abbrev}/week/${current_date}" 
+    local schedule_week_endpt="https://api-web.nhle.com/v1/club-schedule/${edm_abbrev}/week/${current_date}" 
+    local week_info=$(curl -sX GET "$schedule_week_endpt")
 
+    # The first element in the list of games for the week is always the one
+    # closest to the current date
+    local next_game=$(echo "$week_info" | jq -c '.games[0]')
+    echo "$next_game"
+}
+
+format_next_game(){
+    local next_game="$1"
+    local away_team=$(echo "$next_game" | jq -r '.awayTeam.abbrev')
+    local home_team=$(echo "$next_game" | jq -r '.homeTeam.abbrev')
+
+    local game_time_utc=$(echo "$next_game" | jq -r '.startTimeUTC')
+    local game_time_mst=$(date -d "$game_time_utc" +"%a @ %H:%M")
+    if [[ -z "$next_game" ]]; then
+        echo "No games scheduled"
+    else
+        echo "$game_time_mst | $away_team @ $home_team"
+    fi
 }
 
 games_today=$(get_games_today)
@@ -114,4 +133,7 @@ if check_if_playing_today "$games_today"; then
         echo "$later_today_output"
     fi
 else
+    next_game=$(get_next_game)
+    next_game_output=$(format_next_game "$next_game")
+    echo "$next_game_output"
 fi
