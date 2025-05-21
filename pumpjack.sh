@@ -7,8 +7,10 @@
 # - Move endpoints to global scope
 
 # No true constants so using read only just to prevent bugs
+declare -A game_info
 current_date=$(date +"%Y-%m-%d")
 edm_abbrev="EDM"
+game_id=0 # used in check_if_playing_today 
 
 ### ENDPOINTS ###
 schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
@@ -16,8 +18,27 @@ schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
 # Format to match the date format in the response
 #echo "The current date is ${current_date}"
 
+make_get_request(){
+    # Make sure that at least one arg was passed
+    if [[  $# -ne 1 ]]; then
+        echo "Usage: make_get_request <endpoint>"
+        return 1
+    fi
+
+    local endpt="$1"
+    local resp
+
+    if ! resp=$(curl -fsSX GET $endpt); then
+        echo "Error: GET request to $endpt failed." >&2 # Pushes to stderr
+        return 1
+    fi
+
+    echo "$resp"
+}
+
 get_games_today(){
-    local schedule_now_data=$(curl -sX GET $schedule_now_endpt)
+    #local schedule_now_data=$(curl -sX GET $schedule_now_endpt)
+    local schedule_now_data=$(make_get_request "$schedule_now_endpt")
     local game_week=$(echo $schedule_now_data | jq -c '.gameWeek[]')
     # Not using quotes with the echo flattens the json causing issues...
     echo "$game_week" | while read -r day; do
@@ -29,7 +50,7 @@ get_games_today(){
     done
 }
 
-declare -A game_info
+games_today=$(get_games_today)
 get_game_info(){
     local game="$1"
     local id=$(echo "$game" | jq -r '.id')
@@ -152,8 +173,6 @@ format_next_game(){
     fi
 }
 
-games_today=$(get_games_today)
-game_id=0 # used in check_if_playing_today 
 
 if check_if_playing_today "$games_today"; then
     if check_if_game_live "$game_id"; then
