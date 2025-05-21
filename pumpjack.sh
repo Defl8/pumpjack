@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -eo pipefail
 # TODO: 
 # - Make functions to get the common values from the responses
 #   - Get away/home team info
@@ -53,6 +53,11 @@ get_games_today(){
 games_today=$(get_games_today)
 get_game_info(){
     local game="$1"
+    if [[  $# -ne 1 ]]; then
+        echo "Usage: get_game_info <game>"
+        return 1
+    fi
+
     local id=$(echo "$game" | jq -r '.id')
     game_info["id"]="$id"
 
@@ -85,13 +90,19 @@ get_game_info(){
 
     local game_time_utc=$(echo "$game" | jq -r '.startTimeUTC')
     game_info["game_time_utc"]="$game_time_utc"
+    return 0
 }
 
 utc_to_local(){
-    local time_utc="$1"
-    local format_local="$2"
-    local time_local=$(date -d "$time_utc" +"$format_local")
+    local time_to_convert="$1"
+    local format="$2"
+    if [[  $# -ne 2 ]]; then
+        echo "Usage: utc_to_local <time_to_convert> <format>"
+        return 1
+    fi
+    local time_local=$(date -d "$time_to_convert" +"$format")
     echo "$time_local"
+    return 0
 }
 
 check_if_playing_today(){
@@ -103,16 +114,14 @@ check_if_playing_today(){
             return 0 # Game is being played today
         fi
     return 1 # Game is not being played today
-
-# while read runs in subshell, this triple arrow is a here string that keeps
-# the loop in the same shell so that I can use the return value
     done <<< "$games_today" 
+    # while read runs in subshell, this triple arrow is a here string that keeps
+    # the loop in the same shell so that I can use the return value
 }
 
 check_if_game_live(){
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
-    #local game=$(curl -sX GET $boxscore_endpt)
     local game=$(make_get_request "$boxscore_endpt")
     get_game_info "$game"
     local game_state="${game_info["game_state"]}"
@@ -124,6 +133,10 @@ check_if_game_live(){
 }
 
 format_live(){
+    if [[ $# -ne 1 ]]; then
+        echo "Usage: format_live <game_id>"
+        return 1
+    fi
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
     local game=$(make_get_request "$boxscore_endpt")
@@ -144,6 +157,10 @@ format_live(){
 }
 
 format_later_today(){
+    if [[ $# -ne 1 ]]; then
+        echo "Usage: format_later_today <game_id>"
+        return 1
+    fi
     local game_id="$1"
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
     local game=$(make_get_request "$boxscore_endpt")
@@ -162,6 +179,7 @@ get_next_game(){
     # closest to the current date
     local next_game=$(echo "$week_info" | jq -c '.games[0]')
     echo "$next_game"
+    return 0
 }
 
 format_next_game(){
@@ -170,8 +188,10 @@ format_next_game(){
     local game_time_local=$(utc_to_local "${game_info["game_time_utc"]}" "%a @ %H:%M")
     if [[ -z "$next_game" ]]; then
         echo "No games scheduled"
+        return 0
     else
         echo "$game_time_local | ${game_info[away_team]} @ ${game_info[home_team]}"
+        return 0
     fi
 }
 
