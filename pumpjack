@@ -124,9 +124,8 @@ check_if_game_live(){
     local boxscore_endpt="https://api-web.nhle.com/v1/gamecenter/${game_id}/boxscore"
     local game=$(make_get_request "$boxscore_endpt")
     get_game_info "$game"
-    local game_state="${game_info["game_state"]}"
     # "FUT" means future
-    if [[ "$game_state" == "OFF" || "$game_state" == "FUT" ]]; then
+    if [[ "${game_info["game_state"]}" == "OFF" || "${game_info["game_state"]}" == "FUT" ]]; then
         return 1
     fi
     return 0
@@ -142,11 +141,11 @@ format_live(){
     local game=$(make_get_request "$boxscore_endpt")
 
     get_game_info "$game"
-    if [[ "$game_info["game_state"]" != "FINAL" ]]; then
+    if [[ "${game_info["game_state"]}" != "FINAL" ]]; then
         echo "${game_info["away_team"]} ${game_info["away_score"]} - ${game_info["period"]} ${game_info["time_remaining"]} - ${game_info["home_score"]} ${game_info["home_team"]}"
         return 0
     else
-        if [[ "$game_info["period"]" != "OT" ]]; then
+        if [[ "${game_info["period"]}" != "OT" ]]; then
             echo "${game_info["away_team"]} ${game_info["away_score"]} - FINAL - ${game_info["home_score"]} ${game_info["home_team"]}"
             return 0
         else
