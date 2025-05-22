@@ -3,11 +3,10 @@ Script for fetching information about live and upcoming Oilers hockey games. Ori
 
 # Road Map (Ordered by priority)
 - [x] ~~D.R.Y.ify the codebase.~~ Did the best I could with what I know. Probably better ways to do this.
-- [ ] Add better exit codes and handling for when *curl* command fails.
+- [x] Add better exit codes and handling for when *curl* command fails.
 - [ ] Return the data as json from the script? (Still not sure about this.) 
     - This would be so that it could be formatted by waybar or other things.
     - Turns out this is probably really simple with *printf*
-- [ ] Functionality for all teams in the NHL.
-    - For this we can just take in the team abbrev as an arg. Could have pattern matching for varied style of arg.
+- [x] ~~Functionality for all teams in the NHL.~~ Might make an internal map so the full team name can be passed and not just the abbreviation.
 - [ ] Add shootout support.
     - Meh
