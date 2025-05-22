@@ -1,22 +1,42 @@
 #!/usr/bin/env bash
 set -eo pipefail
-# TODO: 
-# - Make functions to get the common values from the responses
-#   - Get away/home team info
-# - Add handling for when GET requests fail
-# - Move endpoints to global scope
+
 
 # No true constants so using read only just to prevent bugs
 declare -A game_info
 current_date=$(date +"%Y-%m-%d")
-edm_abbrev="EDM"
-game_id=0 # used in check_if_playing_today 
 
 ### ENDPOINTS ###
 schedule_now_endpt="https://api-web.nhle.com/v1/schedule/${current_date}"
 
-# Format to match the date format in the response
-#echo "The current date is ${current_date}"
+arg_passed="${1^^}" # Force uppercase
+team_abbrev=""
+
+# Make sure an arg was passed
+if [[ $# -ne 1 ]]; then
+    echo "Usage: pumpjack <team_name>" 
+    echo "Error: not enough arguments supplied" >&2
+    exit 1
+fi
+
+validate_abbrev:W(){
+    if [[ $# -ne 1 ]]; then
+        echo "convert_arg_to_abbrev <arg>" 
+        return 1
+    fi
+
+    local arg="$1"
+
+    if [[ "${#arg}" -lt 3 || "${#arg}" -gt 3 ]]; then
+        echo "Error: argument is not the correct length." >&2
+        return 1
+    fi
+
+    echo "${arg^^}" 
+    return 0
+}
+
+team_abbrev=$(validate_abbrev:W "$arg_passed")
 
 make_get_request(){
     # Make sure that at least one arg was passed
@@ -109,7 +129,7 @@ check_if_playing_today(){
     local games_today="$1"
     while read -r game; do
         get_game_info "$game"
-        if [[ "${game_info["home_team"]}" == "$edm_abbrev" || "${game_info["away_team"]}" == "$edm_abbrev" ]]; then
+        if [[ "${game_info["home_team"]}" == "$team_abbrev" || "${game_info["away_team"]}" == "$team_abbrev" ]]; then
             game_id="${game_info["id"]}"
             return 0 # Game is being played today
         fi
@@ -170,7 +190,7 @@ format_later_today(){
 }
 
 get_next_game(){
-    local schedule_week_endpt="https://api-web.nhle.com/v1/club-schedule/${edm_abbrev}/week/${current_date}" 
+    local schedule_week_endpt="https://api-web.nhle.com/v1/club-schedule/${team_abbrev}/week/${current_date}" 
     #local week_info=$(curl -sX GET "$schedule_week_endpt")
     local week_info=$(make_get_request "$schedule_week_endpt")
 
@@ -193,6 +213,8 @@ format_next_game(){
         return 0
     fi
 }
+
+game_id=0 # When the game is found the id for easy lookup is stored here
 
 
 if check_if_playing_today "$games_today"; then
