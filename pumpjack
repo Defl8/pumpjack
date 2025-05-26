@@ -19,7 +19,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-validate_abbrev:W(){
+validate_abbrev(){
     if [[ $# -ne 1 ]]; then
         echo "convert_arg_to_abbrev <arg>" 
         return 1
@@ -36,7 +36,7 @@ validate_abbrev:W(){
     return 0
 }
 
-team_abbrev=$(validate_abbrev:W "$arg_passed")
+team_abbrev=$(validate_abbrev "$arg_passed")
 
 make_get_request(){
     # Make sure that at least one arg was passed
