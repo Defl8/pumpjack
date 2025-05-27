@@ -24,7 +24,6 @@ type Data struct {
 }
 
 func main() {
-	// Get all the team information
 	teamArg, err := GetTeamArg()
 	if err != nil {
 		log.Fatalln("ERROR:", err)
