@@ -24,12 +24,16 @@ type Data struct {
 }
 
 func main() {
+	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
+	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
+	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
+
 	teamArg, err := GetTeamArg()
 	if err != nil {
 		log.Fatalln("ERROR:", err)
 	}
 
-	teamResp := MakeGetRequest("https://api.nhle.com/stats/rest/en/team")
+	teamResp := MakeGetRequest(TeamEndpt)
 	teams := GetTeamInfo(teamResp)
 
 	team, err := FindTeam(teamArg, teams)
