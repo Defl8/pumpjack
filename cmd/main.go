@@ -32,6 +32,23 @@ type Game struct {
 	HomeTeam  GameTeam  `json:"homeTeam"`
 	StartTime time.Time `json:"startTimeUTC"`
 	GameState string    `json:"gameState"`
+	DayOfWeek string
+}
+
+type JsonOutput struct {
+	AwayAbbrev     string
+	HomeAbbrev     string
+	StartTimeLocal string
+	DayOfWeek      string
+}
+
+func NewJsonOutput(aAbbrev string, hAbbrev string, startTime string, dayWeek string) *JsonOutput {
+	return &JsonOutput{
+		AwayAbbrev:     aAbbrev,
+		HomeAbbrev:     hAbbrev,
+		StartTimeLocal: startTime,
+		DayOfWeek:      dayWeek,
+	}
 }
 
 type GameTeam struct {
@@ -67,6 +84,7 @@ const (
 )
 
 const DateFormat = "2006-01-02"
+const ShortDayOfWeekFormat = "Mon"
 
 func main() {
 	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
@@ -96,7 +114,14 @@ func main() {
 		fmt.Println("No games scheduled.")
 		return
 	}
-	fmt.Println(game)
+
+	if game.StartTime.Local().Format(DateFormat) == currentDate {
+		game.DayOfWeek = "Today"
+	} else {
+		game.DayOfWeek = game.StartTime.Local().Format(ShortDayOfWeekFormat)
+	}
+
+	MarshalOutput(game)
 }
 
 func MakeGetRequest(url string) *http.Response {
@@ -181,4 +206,14 @@ func (gW *GameWeek) GetTeamNextGame(chosenTeamPt *GameTeam) (*Game, bool) {
 		}
 	}
 	return nil, false
+}
+
+func MarshalOutput(game *Game) {
+	const TimeFormat = "15:04"
+	jsonOutput := NewJsonOutput(game.AwayTeam.Abbrev, game.HomeTeam.Abbrev, game.StartTime.Local().Format(TimeFormat), game.DayOfWeek)
+	jsonData, err := json.Marshal(jsonOutput)
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+	fmt.Println(string(jsonData))
 }
