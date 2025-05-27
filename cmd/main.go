@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-type Team struct {
+type TeamInfo struct {
 	Id     int    `json:"id"`
 	Name   string `json:"fullName"`
-	Abbrev string `json:"abbrev"`
+	Abbrev string `json:"triCode"`
 }
 
 type TeamIdentifier interface {
@@ -22,23 +22,43 @@ type TeamIdentifier interface {
 }
 
 type Data struct {
-	Data []Team `json:"data"`
+	Data []TeamInfo `json:"data"`
 }
 
 // Make getter and setter for the time to be converted to local time
 type Game struct {
-	AwayTeam  Team
-	HomeTeam  Team
-	StartTime time.Time
+	Id        int       `json:"id"`
+	AwayTeam  GameTeam  `json:"awayTeam"`
+	HomeTeam  GameTeam  `json:"homeTeam"`
+	StartTime time.Time `json:"startTimeUTC"`
+	GameState string    `json:"gameState"`
+}
+
+type GameTeam struct {
+	Id     int    `json:"id"`
+	Abbrev string `json:"abbrev"`
+	Score  int    `json:"score"`
+}
+
+func NewGameTeam(id int, abbrev string, score int) *GameTeam {
+	return &GameTeam{
+		Id:     id,
+		Abbrev: abbrev,
+		Score:  score,
+	}
 }
 
 type GameDay struct {
-	Games []Game `json:"games"`
+	DateStr   string `json:"date"`
+	DayAbbrev string `json:"dayAbbrev"`
+	Games     []Game `json:"games"`
 }
 
 type GameWeek struct {
 	GameDays []GameDay `json:"gameWeek"`
 }
+
+const DateFormat = "2006-01-02"
 
 func main() {
 	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
@@ -55,11 +75,20 @@ func main() {
 	teamResp := MakeGetRequest(TeamEndpt)
 	teams := GetTeamInfo(teamResp)
 
-	team, err := FindTeam(teamArg, teams)
+	chosenTeam, err := FindTeam(teamArg, teams)
 	if err != nil {
 		log.Fatalln("ERROR:", err)
 	}
-	fmt.Println(team)
+
+	currentDate := time.Now().Format(DateFormat)
+	schedNowResp := MakeGetRequest(ScheduleNowEndpt + currentDate)
+	gameWeek := GetGamesThisWeek(schedNowResp)
+	game, found := gameWeek.GetTeamNextGame(chosenTeam, currentDate)
+	if !found {
+		fmt.Println("No games scheduled.")
+		return
+	}
+	fmt.Println(game)
 }
 
 func MakeGetRequest(url string) *http.Response {
@@ -70,7 +99,7 @@ func MakeGetRequest(url string) *http.Response {
 	return resp
 }
 
-func GetTeamInfo(response *http.Response) []Team {
+func GetTeamInfo(response *http.Response) []TeamInfo {
 	resp_body := response.Body
 
 	defer resp_body.Close()
@@ -84,26 +113,26 @@ func GetTeamInfo(response *http.Response) []Team {
 	return data.Data
 }
 
-func FindTeam[T TeamIdentifier](teamIdentifier T, teams []Team) (*Team, error) {
-	var foundTeam *Team
+func FindTeam[T TeamIdentifier](teamIdentifier T, teams []TeamInfo) (*GameTeam, error) {
+	var foundTeam *TeamInfo
 	for i, team := range teams {
 		switch identifier := any(teamIdentifier).(type) {
 		case int:
 			if identifier == team.Id {
 				foundTeam = &teams[i]
-				return foundTeam, nil
+				return NewGameTeam(foundTeam.Id, foundTeam.Abbrev, 0), nil
 			}
 		case string:
 			upperIdentifier := strings.TrimSpace(identifier)
 			if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) {
 				foundTeam = &teams[i]
-				return foundTeam, nil
+				return NewGameTeam(foundTeam.Id, foundTeam.Abbrev, 0), nil
 			}
 		default:
 			continue
 		}
 	}
-	return foundTeam, errors.New("No team was found with the given tricode.")
+	return nil, errors.New("No team was found with the given identifier.")
 }
 
 func GetTeamArg() (string, error) {
@@ -122,4 +151,29 @@ func GetTeamArg() (string, error) {
 
 	teamArgUpper = strings.ToUpper(args[1])
 	return teamArgUpper, err
+}
+
+func GetGamesThisWeek(response *http.Response) GameWeek {
+	resp_body := response.Body
+	defer resp_body.Close()
+
+	var gameWeek GameWeek
+	if err := json.NewDecoder(resp_body).Decode(&gameWeek); err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+	return gameWeek
+}
+
+func (gW *GameWeek) GetTeamNextGame(chosenTeamPt *GameTeam, dateStr string) (*Game, bool) {
+	for _, gameDay := range gW.GameDays {
+		if gameDay.DateStr == dateStr {
+			for _, game := range gameDay.Games {
+				if game.AwayTeam.Abbrev == chosenTeamPt.Abbrev || game.HomeTeam.Abbrev == chosenTeamPt.Abbrev {
+					gameTeam
+					return &game, true
+				}
+			}
+		}
+	}
+	return nil, false
 }
