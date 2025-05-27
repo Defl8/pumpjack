@@ -8,13 +8,15 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type Team struct {
-	Id      int    `json:"id"`
-	Name    string `json:"fullName"`
-	Tricode string `json:"triCode"`
+	Id     int    `json:"id"`
+	Name   string `json:"fullName"`
+	Abbrev string `json:"abbrev"`
 }
+
 type TeamIdentifier interface {
 	~int | ~string
 }
@@ -23,10 +25,27 @@ type Data struct {
 	Data []Team `json:"data"`
 }
 
+// Make getter and setter for the time to be converted to local time
+type Game struct {
+	AwayTeam  Team
+	HomeTeam  Team
+	StartTime time.Time
+}
+
+type GameDay struct {
+	Games []Game `json:"games"`
+}
+
+type GameWeek struct {
+	GameDays []GameDay `json:"gameWeek"`
+}
+
 func main() {
 	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
-	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
-	const TeamEndpt = "https://api.nhle.com/stats/rest/en/team"
+
+	// This needs the current date attached to the end
+	// YYYY-MM-DD format
+	const ScheduleNowEndpt = "https://api-web.nhle.com/v1/schedule/"
 
 	teamArg, err := GetTeamArg()
 	if err != nil {
@@ -76,7 +95,7 @@ func FindTeam[T TeamIdentifier](teamIdentifier T, teams []Team) (*Team, error) {
 			}
 		case string:
 			upperIdentifier := strings.TrimSpace(identifier)
-			if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) || upperIdentifier == team.Tricode {
+			if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) {
 				foundTeam = &teams[i]
 				return foundTeam, nil
 			}
