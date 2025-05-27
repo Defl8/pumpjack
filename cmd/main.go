@@ -58,6 +58,14 @@ type GameWeek struct {
 	GameDays []GameDay `json:"gameWeek"`
 }
 
+type GameState string
+
+const (
+	Future GameState = "FUT"
+	Off    GameState = "OFF"
+	Live   GameState = "LIVE"
+)
+
 const DateFormat = "2006-01-02"
 
 func main() {
