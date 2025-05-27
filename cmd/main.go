@@ -83,7 +83,7 @@ func main() {
 	currentDate := time.Now().Format(DateFormat)
 	schedNowResp := MakeGetRequest(ScheduleNowEndpt + currentDate)
 	gameWeek := GetGamesThisWeek(schedNowResp)
-	game, found := gameWeek.GetTeamNextGame(chosenTeam, currentDate)
+	game, found := gameWeek.GetTeamNextGame(chosenTeam)
 	if !found {
 		fmt.Println("No games scheduled.")
 		return
@@ -164,14 +164,11 @@ func GetGamesThisWeek(response *http.Response) GameWeek {
 	return gameWeek
 }
 
-func (gW *GameWeek) GetTeamNextGame(chosenTeamPt *GameTeam, dateStr string) (*Game, bool) {
+func (gW *GameWeek) GetTeamNextGame(chosenTeamPt *GameTeam) (*Game, bool) {
 	for _, gameDay := range gW.GameDays {
-		if gameDay.DateStr == dateStr {
-			for _, game := range gameDay.Games {
-				if game.AwayTeam.Abbrev == chosenTeamPt.Abbrev || game.HomeTeam.Abbrev == chosenTeamPt.Abbrev {
-					gameTeam
-					return &game, true
-				}
+		for _, game := range gameDay.Games {
+			if game.AwayTeam.Abbrev == chosenTeamPt.Abbrev || game.HomeTeam.Abbrev == chosenTeamPt.Abbrev {
+				return &game, true
 			}
 		}
 	}
