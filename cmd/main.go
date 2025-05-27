@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -22,20 +23,21 @@ type Data struct {
 	Data []Team `json:"data"`
 }
 
-//func NewTeam(name, tricode string, id int) *Team {
-//	return &Team{
-//		Id:      id,
-//		Name:    name,
-//		Tricode: tricode,
-//	}
-//}
-
 func main() {
 	// Get all the team information
+	teamArg, err := GetTeamArg()
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+
 	teamResp := MakeGetRequest("https://api.nhle.com/stats/rest/en/team")
 	teams := GetTeamInfo(teamResp)
-	team, _ := FindTeam("	oilers", teams)
-	fmt.Println(team.Id, team.Name, team.Tricode)
+
+	team, err := FindTeam(teamArg, teams)
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+	fmt.Println(team)
 }
 
 func MakeGetRequest(url string) *http.Response {
@@ -70,7 +72,7 @@ func FindTeam[T TeamIdentifier](teamIdentifier T, teams []Team) (*Team, error) {
 				return foundTeam, nil
 			}
 		case string:
-			upperIdentifier := strings.ToUpper(strings.TrimSpace(identifier))
+			upperIdentifier := strings.TrimSpace(identifier)
 			if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) || upperIdentifier == team.Tricode {
 				foundTeam = &teams[i]
 				return foundTeam, nil
@@ -80,4 +82,22 @@ func FindTeam[T TeamIdentifier](teamIdentifier T, teams []Team) (*Team, error) {
 		}
 	}
 	return foundTeam, errors.New("No team was found with the given tricode.")
+}
+
+func GetTeamArg() (string, error) {
+	args := os.Args
+	var teamArgUpper string
+	var err error = nil
+
+	argNum := len(args)
+	if argNum < 2 {
+		err = errors.New("No argument passed.")
+		return teamArgUpper, err
+	} else if argNum > 2 {
+		err = errors.New("Too may arguments passed.")
+		return teamArgUpper, err
+	}
+
+	teamArgUpper = strings.ToUpper(args[1])
+	return teamArgUpper, err
 }
