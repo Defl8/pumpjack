@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,12 +28,13 @@ type Data struct {
 
 // Make getter and setter for the time to be converted to local time
 type Game struct {
-	Id        int       `json:"id"`
-	AwayTeam  GameTeam  `json:"awayTeam"`
-	HomeTeam  GameTeam  `json:"homeTeam"`
-	StartTime time.Time `json:"startTimeUTC"`
-	GameState string    `json:"gameState"`
-	DayOfWeek string
+	Id         int        `json:"id"`
+	AwayTeam   GameTeam   `json:"awayTeam"`
+	HomeTeam   GameTeam   `json:"homeTeam"`
+	StartTime  time.Time  `json:"startTimeUTC"`
+	GameState  string     `json:"gameState"`
+	PeriodInfo PeriodDesc `json:"periodDescriptor"`
+	DayOfWeek  string
 }
 
 type JsonOutput struct {
@@ -63,6 +65,11 @@ func NewGameTeam(id int, abbrev string, score int) *GameTeam {
 		Abbrev: abbrev,
 		Score:  score,
 	}
+}
+
+type PeriodDesc struct {
+	Number int    `json:"number"`
+	Type   string `json:"periodType"`
 }
 
 type GameDay struct {
@@ -120,8 +127,7 @@ func main() {
 	} else {
 		game.DayOfWeek = game.StartTime.Local().Format(ShortDayOfWeekFormat)
 	}
-
-	MarshalOutput(game)
+	TextOutput(game)
 }
 
 func MakeGetRequest(url string) *http.Response {
@@ -157,7 +163,11 @@ func FindTeam[T TeamIdentifier](teamIdentifier T, teams []TeamInfo) (*GameTeam, 
 			}
 		case string:
 			upperIdentifier := strings.TrimSpace(identifier)
-			if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) {
+			if len(upperIdentifier) == 3 && upperIdentifier == strings.ToUpper(team.Abbrev) {
+				foundTeam = &teams[i]
+				return NewGameTeam(foundTeam.Id, foundTeam.Abbrev, 0), nil
+
+			} else if strings.Contains(strings.ToUpper(team.Name), upperIdentifier) {
 				foundTeam = &teams[i]
 				return NewGameTeam(foundTeam.Id, foundTeam.Abbrev, 0), nil
 			}
@@ -206,6 +216,37 @@ func (gW *GameWeek) GetTeamNextGame(chosenTeamPt *GameTeam) (*Game, bool) {
 		}
 	}
 	return nil, false
+}
+
+func TextOutput(game *Game) {
+	const TimeFormat = "15:04"
+	var outputStr string
+	var err error
+	err = nil
+	switch GameState(game.GameState) {
+	case Future:
+		outputStr = fmt.Sprintf("%s @ %s | %s @ %s", game.DayOfWeek, game.StartTime.Local().Format(TimeFormat), game.AwayTeam.Abbrev, game.HomeTeam.Abbrev)
+	case Live:
+		var periodStr string
+		switch game.PeriodInfo.Number {
+		case 1:
+			periodStr = strconv.Itoa(game.PeriodInfo.Number) + "st"
+		case 2:
+			periodStr = strconv.Itoa(game.PeriodInfo.Number) + "nd"
+		case 3:
+			periodStr = strconv.Itoa(game.PeriodInfo.Number) + "rd"
+		default: // Anything higher than 3
+			periodStr = "OT"
+		}
+		outputStr = fmt.Sprintf("%s %d - %s - %d %s", game.AwayTeam.Abbrev, game.AwayTeam.Score, periodStr, game.HomeTeam.Score, game.HomeTeam.Abbrev)
+	default:
+		err = errors.New("Game status unknown")
+	}
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+
+	fmt.Println(outputStr)
 }
 
 func MarshalOutput(game *Game) {
