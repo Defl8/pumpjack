@@ -89,6 +89,8 @@ const (
 	Off    GameState = "OFF"
 	Live   GameState = "LIVE"
 	Pre    GameState = "PRE"
+	Crit   GameState = "CRIT"
+	Final  GameState = "FINAL"
 )
 
 const DateFormat = "2006-01-02"
@@ -228,7 +230,8 @@ func TextOutput(game *Game) {
 	switch GameState(game.State) {
 	case Future:
 		outputStr = fmt.Sprintf("%s @ %s | %s @ %s", game.DayOfWeek, game.StartTime.Local().Format(TimeFormat), game.AwayTeam.Abbrev, game.HomeTeam.Abbrev)
-	case Live, Pre:
+	case Live, Pre, Crit:
+
 		var periodStr string
 		switch game.PeriodInfo.Number {
 		case 1:
@@ -240,7 +243,10 @@ func TextOutput(game *Game) {
 		default: // Anything higher than 3
 			periodStr = "OT"
 		}
+
 		outputStr = fmt.Sprintf("%s %d - %s - %d %s", game.AwayTeam.Abbrev, game.AwayTeam.Score, periodStr, game.HomeTeam.Score, game.HomeTeam.Abbrev)
+	case Final:
+		outputStr = fmt.Sprintf("%s %d - FINAL - %d %s", game.AwayTeam.Abbrev, game.AwayTeam.Score, game.HomeTeam.Score, game.HomeTeam.Abbrev)
 	default:
 		err = errors.New("Game status unknown")
 	}
