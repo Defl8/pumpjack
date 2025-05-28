@@ -32,7 +32,7 @@ type Game struct {
 	AwayTeam   GameTeam   `json:"awayTeam"`
 	HomeTeam   GameTeam   `json:"homeTeam"`
 	StartTime  time.Time  `json:"startTimeUTC"`
-	GameState  string     `json:"gameState"`
+	State      string     `json:"gameState"`
 	PeriodInfo PeriodDesc `json:"periodDescriptor"`
 	DayOfWeek  string
 }
@@ -88,6 +88,7 @@ const (
 	Future GameState = "FUT"
 	Off    GameState = "OFF"
 	Live   GameState = "LIVE"
+	Pre    GameState = "PRE"
 )
 
 const DateFormat = "2006-01-02"
@@ -127,6 +128,7 @@ func main() {
 	} else {
 		game.DayOfWeek = game.StartTime.Local().Format(ShortDayOfWeekFormat)
 	}
+
 	TextOutput(game)
 }
 
@@ -223,10 +225,10 @@ func TextOutput(game *Game) {
 	var outputStr string
 	var err error
 	err = nil
-	switch GameState(game.GameState) {
+	switch GameState(game.State) {
 	case Future:
 		outputStr = fmt.Sprintf("%s @ %s | %s @ %s", game.DayOfWeek, game.StartTime.Local().Format(TimeFormat), game.AwayTeam.Abbrev, game.HomeTeam.Abbrev)
-	case Live:
+	case Live, Pre:
 		var periodStr string
 		switch game.PeriodInfo.Number {
 		case 1:
